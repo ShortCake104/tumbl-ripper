@@ -5,12 +5,13 @@ import urllib.request
 from urllib.parse import urlparse, parse_qs
 import json
 import threading
+from dotenv import load_dotenv
+import os
 
 class OAuthServer(BaseHTTPRequestHandler):
     def do_GET(self):
         global auth_code
-        auth_path = self.path
-        parsed_path = urlparse(auth_path)
+        parsed_path = urlparse(self.path)
         query = parse_qs(parsed_path.query)
         auth_code = query["code"][0]
         self.send_response(200)
@@ -35,17 +36,19 @@ def main():
     with urllib.request.urlopen(req) as res:
         oauth.parse_request_body_response(res.read())
 
-    print(f"refresh token: {oauth.refresh_token}")
+    print(f"access token: {oauth.access_token}\nrefresh token: {oauth.refresh_token}")
+    with open("refresh_token", "w") as f:
+        f.write(oauth.refresh_token)
 
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
 
-
-CONSUMER_KEY = ''
-CONSUMER_SECRET = ''
+CONSUMER_KEY = os.getenv("CONSUMER_KEY")
+CONSUMER_SECRET = os.getenv("CONSUMER_SECRET")
 SCOPE = ["basic", "write", "offline_access"]
 REDIRECT_URL = "http://localhost:8000/"
 
 httpd = HTTPServer(("localhost", 8000), OAuthServer)
-auth_path = None
 auth_code = None
 
 if __name__ == "__main__":
