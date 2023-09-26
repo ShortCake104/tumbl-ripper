@@ -56,8 +56,8 @@ class OAuthServer(BaseHTTPRequestHandler):
 logger = make_logger(__name__)
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-CONSUMER_KEY = ""
-CONSUMER_SECRET = ""
+CONSUMER_KEY = "your consumer key"
+CONSUMER_SECRET = "your consumer secret key"
 
 t = Tumblpy(CONSUMER_KEY, CONSUMER_SECRET)
 
