@@ -1,2 +1,2 @@
 # tumbl-ripper
-tumblr apiを使ったダウンローダー
+The default callback URL for the application should be http://localhost:8000/
