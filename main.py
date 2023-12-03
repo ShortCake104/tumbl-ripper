@@ -1,101 +1,67 @@
 import os
-import pprint
+import re
 import time
-import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from logging import (DEBUG, INFO, FileHandler, Formatter, StreamHandler,
-                     getLogger)
-from threading import Thread
-from webbrowser import open_new
 
+import pytumblr
 import requests
 from bs4 import BeautifulSoup as bs
+from pystyle import *
 from tqdm import tqdm
-from tumblpy import Tumblpy
+from tumblpy.exceptions import TumblpyError
 from urlextract import URLExtract
 
 
-def make_logger(name):
-    logger = getLogger(name)
-    logger.setLevel(DEBUG)
+class TumblrClient():
+    def __init__(self, consumer_key, consumer_secret, oauth_token, oauth_secret):
+        self.client = pytumblr.TumblrRestClient(consumer_key, consumer_secret, oauth_token, oauth_secret)
 
-    st_handler = StreamHandler()
-    st_handler.setLevel(INFO)
-    st_handler.setFormatter(Formatter("[{levelname}] {message}", style="{"))
-    logger.addHandler(st_handler)
+    def get(self, endpoint, blog_url, params=None):
+        if params is None:
+            params = {}
+        m = re.match(r"https://(.*)\.tumblr\.com/(.*)", blog_url)
+        if m is None:
+            return {'meta': {'status': 404, 'msg': 'Not Found'}, 'response': [], 'errors': [{'title': 'Not Found', 'code': 0, 'detail': 'Something flubbed. Try again.'}]}
+        else:
+            if m.group(1) == "www":
+                blog_name = m.group(2)
+            else:
+                blog_name = m.group(1)
+        if endpoint == "posts":
+            return self.client.posts(blog_name, **params)
 
-    fl_handler = FileHandler(filename=".log", encoding="utf-8", mode="w")
-    fl_handler.setLevel(DEBUG)
-    fl_handler.setFormatter(
-        Formatter(
-            "[{levelname}] {asctime} [{filename}:{lineno}] {message}", style="{"
-        )
-    )
-    logger.addHandler(fl_handler)
-
-    return logger
-
-class OAuthServer(BaseHTTPRequestHandler):
-    def do_GET(self):
-        global oauth_verifier
-        try:
-            parsed_path = urllib.parse.urlparse(self.path)
-            query = urllib.parse.parse_qs(parsed_path.query)
-            oauth_verifier = query["oauth_verifier"][0]
-            response = f"Successfully!\nAuthorization Code: {oauth_verifier}"
-            print(response)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(bytes(response, encoding="utf-8"))
-            Thread(target=httpd.shutdown, daemon=True).start()
-        except KeyError:
-            logger.error("error")
-            logger.error(self.path)
-
-logger = make_logger(__name__)
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 CONSUMER_KEY = "nrJ1hOSYbWBFMd7QGWdSNW2Trr5A9yDvbmUvizGiskOPNjlcGM"
 CONSUMER_SECRET = "v95C36kOWg5Cm4Kq3W3eRFcZwN6j6AJdYagBNiYhrVoOU0dOM1"
+OAUTH_TOKEN = '5Fn3JU0mrLbcfiQ7u6aqhfTzRXNOgSVsCwnH0kQOaOj8IQHXYy'
+OAUTH_SECRET = 'sTVSisoDxwTyL937SJvAk1cdgR8fiWwQzXOZZUCwt2jhNwvFoL'
 
-t = Tumblpy(CONSUMER_KEY, CONSUMER_SECRET)
+client = TumblrClient(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_SECRET)
 
-auth_props = t.get_authentication_tokens()
-auth_url = auth_props["auth_url"]
-#example https://siyomato.tumblr.com/?oauth_token=UQ3CcKnCxbbPO7VnsNHvhxvIGexYYcqWIFrxOK7ySTfXGKDO2q&oauth_verifier=6ttfXTuj3SUeNUhhtizKbbcSV0BbuA6HgH2M4hOisr5HfFN1PR
+banner = """
+┏┳┓     ┓ ┓  ┳┓•        
+ ┃ ┓┏┏┳┓┣┓┃━━┣┫┓┏┓┏┓┏┓┏┓
+ ┻ ┗┻┛┗┗┗┛┗  ┛┗┗┣┛┣┛┗ ┛ 
+                ┛ ┛     
+"""
 
-OAUTH_TOKEN = auth_props["oauth_token"]
-OAUTH_TOKEN_SECRET = auth_props["oauth_token_secret"]
-oauth_verifier = None
+version = "1.0"
 
-print(auth_url)
-print(OAUTH_TOKEN)
-print(OAUTH_TOKEN_SECRET)
-
-open_new(auth_url)
-
-httpd = HTTPServer(("localhost", 8000), OAuthServer)
-httpd.serve_forever()
-
-t = Tumblpy(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
-
-print(oauth_verifier)
-authorized_tokens = t.get_authorized_tokens(oauth_verifier)
-
-oauth_token = authorized_tokens["oauth_token"]
-oauth_token_secret = authorized_tokens["oauth_token_secret"]
-
-print(oauth_token)
-print(oauth_token_secret)
+System.Title(f"Tumbl-Ripper v{version}")
 
 if __name__ == "__main__":
+    print(Colorate.Vertical(Colors.blue_to_cyan, Center.XCenter(banner), 1))
     while True:
         blog = input("> ")
 
         print("blog url:", blog)
-
-        json = t.get("posts", blog_url=blog)
+        try:
+            json = client.get("posts", blog_url=blog)
+        except TumblpyError:
+            if "There was an error making your request.":
+                print("RateLimit!")
+                input("")
+                exit()
 
         blog_info = json["blog"]
         name = blog_info["name"]
@@ -113,6 +79,8 @@ if __name__ == "__main__":
         #pprint.pprint(json)
         #exit()
 
+        offset = 0
+
         while True:
             posts_ = json["posts"]
             for post in posts_:
@@ -120,7 +88,7 @@ if __name__ == "__main__":
                 #    continue
                 post_ = dict()
                 post_["id"] = post["id_string"]
-                post["id_string"]
+                #post["id_string"]
                 urls = list()
                 if post["type"] == "photo":
                     photos = post["photos"]
@@ -146,8 +114,9 @@ if __name__ == "__main__":
                 params = json["_links"]["next"]["query_params"]
             except KeyError:
                 break
+            offset = offset + len(posts_)
             time.sleep(1)
-            json = t.get("posts", blog_url=blog, params=params)
+            json = client.get("posts", blog_url=blog, params={"offset": offset})
 
         # download
         print("download started.")
