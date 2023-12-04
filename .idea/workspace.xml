@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a7759f51-fd36-4ead-bb76-a03493c76450" name="変更" comment="tokorodeyo">
+    <list default="true" id="a7759f51-fd36-4ead-bb76-a03493c76450" name="変更" comment="使用ライブラリの変更">
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -75,7 +77,31 @@
       <option name="project" value="LOCAL" />
       <updated>1695678563543</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="first commit.">
+      <option name="closed" value="true" />
+      <created>1701629371624</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1701629371624</updated>
+    </task>
+    <task id="LOCAL-00003" summary="update.">
+      <option name="closed" value="true" />
+      <created>1701629382823</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1701629382823</updated>
+    </task>
+    <task id="LOCAL-00004" summary="使用ライブラリの変更">
+      <option name="closed" value="true" />
+      <created>1701629405119</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1701629405119</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -91,6 +117,9 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="tokorodeyo" />
-    <option name="LAST_COMMIT_MESSAGE" value="tokorodeyo" />
+    <MESSAGE value="first commit." />
+    <MESSAGE value="update." />
+    <MESSAGE value="使用ライブラリの変更" />
+    <option name="LAST_COMMIT_MESSAGE" value="使用ライブラリの変更" />
   </component>
 </project>
