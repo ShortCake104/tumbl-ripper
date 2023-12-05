@@ -219,7 +219,6 @@ if __name__ == "__main__":
                 name = f"{post_id}_p{p}{ext}"
                 path = os.path.join(img_dir, name)
                 if os.path.exists(path):
-                    time.sleep(0.01)
                     continue
                 while True:
                     with open(path, "wb") as f:
@@ -235,8 +234,9 @@ if __name__ == "__main__":
                         time.sleep(1)
                         continue
                     else:
+                        file_size = os.path.getsize(path)
                         files_num = files_num + 1
-                        files_size = files_size + 1
+                        files_size = files_size + file_size
                         break
         end = time.time()
         print(Colorate.Horizontal(Colors.blue_to_cyan,
