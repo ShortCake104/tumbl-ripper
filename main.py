@@ -1,3 +1,4 @@
+import datetime
 import json
 import math
 import os
@@ -17,23 +18,27 @@ from tqdm.rich import tqdm
 from urlextract import URLExtract
 
 
-class TumblrClient():
+class TumblrClient:
     def __init__(self, consumer_key, consumer_secret, oauth_token, oauth_secret):
         self.client = pytumblr.TumblrRestClient(consumer_key, consumer_secret, oauth_token, oauth_secret)
 
-    def get(self, endpoint, blog_url, params=None):
-        if params is None:
-            params = {}
-        m = re.match(r"https://(.*)\.tumblr\.com/(.*)", blog_url)
-        if m is None:
-            return None
-        else:
-            if m.group(1) == "www":
-                blog_name = m.group(2)
-            else:
-                blog_name = m.group(1)
+    def get(self, endpoint, blog_url=None, offset=0):
         if endpoint == "posts":
-            return self.client.posts(blog_name, **params)
+            params = {
+                "offset": offset,
+                "limit": 50
+            }
+            m = re.match(r"https://(.*)\.tumblr\.com/(\w*)", blog_url)
+            if m is None:
+                return None
+            else:
+                if m.group(1) == "www":
+                    blog_name = m.group(2)
+                else:
+                    blog_name = m.group(1)
+            return self.client.posts(blog_name, "photo", **params)
+        elif endpoint == "follwoing":
+            return self.client.following()
 
 
 def setup():
@@ -56,12 +61,14 @@ def settings_load():
     with open("./settings.json", "r", encoding="utf-8") as f:
         settings = json.load(f)
 
+
 def convert_size(size):
     units = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB")
     i = math.floor(math.log(size, 1024)) if size > 0 else 0
     size = round(size / 1024**i, 2)
 
     return f"{size} {units[i]}"
+
 
 def download(posts):
     file_num = 0
@@ -95,13 +102,21 @@ def download(posts):
                         break
     main()
 
+def settings():
+    with open("settings.json", "r") as f:
+        settings = json.load(f)
+    return settings
+
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 warnings.simplefilter("ignore", category=TqdmExperimentalWarning)
 
-CONSUMER_KEY = "nrJ1hOSYbWBFMd7QGWdSNW2Trr5A9yDvbmUvizGiskOPNjlcGM"
-CONSUMER_SECRET = "v95C36kOWg5Cm4Kq3W3eRFcZwN6j6AJdYagBNiYhrVoOU0dOM1"
-OAUTH_TOKEN = '5Fn3JU0mrLbcfiQ7u6aqhfTzRXNOgSVsCwnH0kQOaOj8IQHXYy'
-OAUTH_SECRET = 'sTVSisoDxwTyL937SJvAk1cdgR8fiWwQzXOZZUCwt2jhNwvFoL'
+settings = settings()
+
+CONSUMER_KEY = settings["auth"]["consumer_key"]
+CONSUMER_SECRET = settings["auth"]["consumer_secret"]
+OAUTH_TOKEN = settings["auth"]["oauth_token"]
+OAUTH_SECRET = settings["auth"]["oauth_secret"]
 
 client = TumblrClient(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_SECRET)
 console = Console()
@@ -122,18 +137,20 @@ if __name__ == "__main__":
     System.Clear()
     while True:
         print(Colorate.Horizontal(Colors.blue_to_cyan, Center.Center(banner, yspaces=2), 1))
-        url = Write.Input(Center.XCenter("[BLOG] > ", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
+        url = Write.Input(Center.XCenter("[RIPPER] > ", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
 
         try:
-            json = client.get("posts", blog_url=url, params={"limit": 50})
+            json = client.get("posts", blog_url=url)
         except Exception as e:
             console.print_exception(extra_lines=5, show_locals=True)
-            Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
+            Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40),
+                        Colors.blue_to_cyan, interval=0, hide_cursor=True)
             exit()
         else:
             if json is None:
                 print(Colorate.Horizontal(Colors.blue_to_cyan, Center.XCenter("[!] ERROR.", spaces=40), 1))
-                Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
+                Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40),
+                            Colors.blue_to_cyan, interval=0, hide_cursor=True)
                 System.Clear()
                 continue
 
@@ -195,10 +212,11 @@ if __name__ == "__main__":
                 offset = offset + len(posts_)
                 # time.sleep(1)
                 try:
-                    json = client.get("posts", blog_url=url, params={"offset": offset, "limit": 50})
+                    json = client.get("posts", blog_url=url, offset=offset)
                 except Exception as e:
                     console.print_exception(extra_lines=5, show_locals=True)
-                    Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
+                    Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40),
+                                Colors.blue_to_cyan, interval=0, hide_cursor=True)
                     System.Clear()
                     break
 
@@ -238,9 +256,9 @@ if __name__ == "__main__":
                         files_num = files_num + 1
                         files_size = files_size + file_size
                         break
-        end = time.time()
+        elapsed = time.time() - start
         print(Colorate.Horizontal(Colors.blue_to_cyan,
-            Box.Lines(f"TIME: {end-start}\nFILES: {files_num}\nSIZE: {convert_size(files_size)}"), 1))
+            Box.Lines(f"TIME: {datetime.timedelta(seconds=elapsed)}\nFILES: {files_num}\nSIZE: {convert_size(files_size)}"), 1))
 
         notification.notify(title="Notice", message="Download finished.", app_name="Tumbl-Ripper", app_icon="./icon.ico")
         print(Colorate.Horizontal(Colors.blue_to_cyan, Center.XCenter("[*] Download finished.", spaces=40), 1))
