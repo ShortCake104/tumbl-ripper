@@ -1,0 +1,18 @@
+directory = "./img"
+
+["auth"]
+consumer_key = ""
+consumer_secret = ""
+oauth_key = ""
+oauth_secret = ""
+
+[notification]
+enable = true
+
+[notification.discord]
+enable = false
+webhookUrl = ""
+
+[notification.discord.mention]
+enable = false
+discordId = ""
