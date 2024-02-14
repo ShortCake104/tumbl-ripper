@@ -5,13 +5,15 @@ import os
 import re
 import shutil
 import time
+import tomllib
 from collections import deque
 
 import pytumblr
 import requests
 from bs4 import BeautifulSoup as bs
+from discord_webhook import DiscordWebhook
 from PIL import Image, UnidentifiedImageError
-from plyer import notification
+from plyer import notification as notice
 from pystyle import *
 from requests.exceptions import ChunkedEncodingError
 from rich.console import Console
@@ -33,16 +35,40 @@ class Client:
 
             return f"{size} {units[i]}"
 
+        def stalker(uuid: str, path: str):
+            if not os.path.exists("./stalker.json"):
+                stalker = {uuid: path}
+                with open("./stalker.json", "w", encoding="utf-8") as f:
+                    json.dump(stalker, f, indent=4, ensure_ascii=False)
+                return True
+            else:
+                with open("./stalker.json", "r", encoding="utf-8") as f:
+                    stalker = json.load(f)
+                if stalker[uuid] == path:
+                    return True
+                else:
+                    old_path = stalker["uuid"]
+                    stalker[uuid] = path
+                    with open("./stalker.json", "w", encoding="utf-8") as f:
+                        json.dump(stalker, f, indent=4, ensure_ascii=False)
+                    return old_path
+
         if qsize := len(self.queue):
             files_num = 0
             files_size = 0
             print_("[*] Download started.")
+            notification("Download stared.")
             start = time.time()
             if qsize != 1:
                 qbar = tqdm(range(qsize), desc="Queue", leave=False)
             for i in range(qsize):
                 post = self.queue.popleft()
                 path = os.path.join(settings["directory"], f"{post['title']}[{post['name']}]")
+                if result := stalker(post["uuid"], os.path.basename(path)):
+                    if not os.path.exists(path):
+                        os.makedirs(path, exist_ok=True)
+                else:
+                    os.rename(os.path.join(settings["directory"], result), path)
                 post_id = post["id"]
                 attachments = post["attachments"]
                 for attachment, p in zip(tqdm(attachments, desc="Attachments", leave=False), range(len(attachments))):
@@ -75,9 +101,10 @@ class Client:
             if "qbar" in locals():
                 qbar.close()
             elapsed = time.time() - start
-            print(Colorate.Horizontal(Colors.blue_to_cyan, Box.Lines
-                (f"TIME: {datetime.timedelta(seconds=elapsed)}\nFILES: {files_num}\nSIZE: {convert_size(files_size)}"), 1))
+            info = f"TIME: {datetime.timedelta(seconds=elapsed)}\nFILES: {files_num}\nSIZE: {convert_size(files_size)}"
+            print(Colorate.Horizontal(Colors.blue_to_cyan, Box.Lines(info), 1))
             print_("[*] Download finished.")
+            notification(f"Download finished.\n{info}")
         else:
             print_("[!] There is nothing in the queue.")
 
@@ -107,6 +134,7 @@ class Client:
             "title": post["blog"]["title"].translate(str.maketrans(
                 {'\\': '＼', '/': '／', ':': '：', '*': '＊', '?': '？', '"': '”', '<': '＜', '>': '＞', '|': '｜'})
             ),
+            "uuid": post["blog"]["uuid"],
             "id": post["id_string"],
             "attachments": attachments
         }
@@ -123,10 +151,12 @@ class Client:
             total_posts = blog_info["total_posts"]
             title = blog_info["title"]
             blog_url = blog_info["url"]
+            info = f"NAME: {name}\nTITLE: {title}\nPOSTS: {total_posts}\nURL: {blog_url}"
             print("")
             print(Colorate.Horizontal(Colors.blue_to_cyan,
-                Box.Lines(f"NAME: {name}\nTITLE: {title}\nPOSTS: {total_posts}\nURL: {blog_url}"), 1))
+                Box.Lines(info), 1))
             print("")
+            notification(info)
         offset = 0
         while True:
             data = self.client.posts(blog_name, "photo", offset=offset, limit=50)
@@ -138,7 +168,8 @@ class Client:
                 {'meta': {'status': 404, 'msg': 'Not Found'}, 'response': [], 
                 'errors': [{'title': 'Not Found', 'code': 0, 'detail': 'Internet strangeness. Try again.'}]}
                 """
-                break
+                time.sleep(10)
+                continue
             for post in posts:
                 self.parse(post)
             offset = offset + len(posts)
@@ -156,9 +187,26 @@ def input_(text: str):
     return Write.Input(Center.XCenter(text, spaces=40), Colors.blue_to_cyan,
                        interval=0, hide_cursor=True)
 
+def notification(message: str):
+    def desktop(message: str):
+        notice.notify(title="Notification", message=message, app_name="Tumbl-Ripper", app_icon="./icon.ico")
+
+    def discord(message: str):
+        if settings["notification"]["discord"]["webhookUrl"] != "":
+            if settings["notification"]["discord"]["mention"]["enable"] == True:
+                if settings["notification"]["discord"]["mention"]["discordId"] != "":
+                    message = f"<@{settings['notification']['discord']['mention']['discordId']}>\n{message}"
+            DiscordWebhook(url=settings["notification"]["discord"]["webhookUrl"], content=message).execute()
+
+    if settings["notification"]["enable"] == True:
+        if settings["notification"]["desktop"]["enable"] == True:
+            desktop(message)
+        if settings["notification"]["discord"]["enable"] == True:
+            discord(message)
+
 def settings():
-    with open("settings.json", "r") as f:
-        settings = json.load(f)
+    with open("settings.toml", "rb") as f:
+        settings = tomllib.load(f)
     return settings
 
 banner = """
@@ -168,9 +216,7 @@ banner = """
                 ┛ ┛     
  
 """
-
-version = "1.1"
-
+version = "1.0"
 System.Title(f"Tumbl-Ripper v{version}")
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -180,15 +226,15 @@ CONSUMER_KEY = settings["auth"]["consumer_key"]
 CONSUMER_SECRET = settings["auth"]["consumer_secret"]
 OAUTH_TOKEN = settings["auth"]["oauth_token"]
 OAUTH_SECRET = settings["auth"]["oauth_secret"]
-
 client = Client(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_SECRET)
+
 console = Console()
 
 if __name__ == "__main__":
-    System.Clear()
     while True:
+        System.Clear()
         print(Colorate.Horizontal(Colors.blue_to_cyan, Center.Center(banner, yspaces=2), 1))
-        url = Write.Input(Center.XCenter("[RIPPER] > ", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
+        url = input_("[RIPPER] > ")
 
         if m := re.match(r"https://(.*)\.tumblr\.com/(\w*)", url):
             if m.group(1) == "www":
@@ -199,7 +245,5 @@ if __name__ == "__main__":
                     client.user(blog_name)
             print_("[*] Fetch done.")
             client.download()
-            notification.notify(title="Notice", message="Download finished.", app_name="Tumbl-Ripper", app_icon="./icon.ico")
 
-        Write.Input(Center.XCenter("[*] Press ENTER to go back.", spaces=40), Colors.blue_to_cyan, interval=0, hide_cursor=True)
-        System.Clear()
+        input_("[*] Press ENTER to go back.")
