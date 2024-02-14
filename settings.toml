@@ -1,9 +1,9 @@
 directory = "./img"
 
-["auth"]
+[auth]
 consumer_key = ""
 consumer_secret = ""
-oauth_key = ""
+oauth_token = ""
 oauth_secret = ""
 
 [notification]
