@@ -44,14 +44,20 @@ class Client:
             else:
                 with open("./stalker.json", "r", encoding="utf-8") as f:
                     stalker = json.load(f)
-                if stalker[uuid] == path:
-                    return True
-                else:
-                    old_path = stalker["uuid"]
+                try:
+                    if stalker[uuid] == path:
+                        return True
+                    else:
+                        old_path = stalker["uuid"]
+                        stalker[uuid] = path
+                        with open("./stalker.json", "w", encoding="utf-8") as f:
+                            json.dump(stalker, f, indent=4, ensure_ascii=False)
+                        return old_path
+                except:
                     stalker[uuid] = path
                     with open("./stalker.json", "w", encoding="utf-8") as f:
                         json.dump(stalker, f, indent=4, ensure_ascii=False)
-                    return old_path
+                    return True
 
         if qsize := len(self.queue):
             files_num = 0
