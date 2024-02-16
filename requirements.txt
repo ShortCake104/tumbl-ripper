@@ -1,0 +1,11 @@
+pytumblr~=0.1.2
+DateTime~=5.1
+requests~=2.31.0
+beautifulsoup4~=4.12.2
+Pillow~=10.0.1
+plyer~=2.1.0
+pystyle~=2.9
+rich~=13.7.0
+tqdm~=4.65.0
+urlextract~=1.8.0
+urllib3~=2.1.0
