@@ -2,6 +2,7 @@ import datetime
 import json
 import math
 import os
+import pickle
 import re
 import shutil
 import time
@@ -24,8 +25,15 @@ from urllib3.exceptions import ProtocolError
 
 class Client:
     def __init__(self, consumer_key, consumer_secret, oauth_token, oauth_secret):
-        self.queue = deque()
         self.client = pytumblr.TumblrRestClient(consumer_key, consumer_secret, oauth_token, oauth_secret)
+        self.queue = deque()
+        if not os.path.exists("./stalker.json"):
+            self.stalker = {}
+            with open("./stalker.json", "w", encoding="utf-8") as f:
+                json.dump(self.stalker, f, indent=4, ensure_ascii=False)
+        else:
+            with open("./stalker.json", "r", encoding="utf-8") as f:
+                self.stalker = json.load(f)
 
     def download(self):
         def convert_size(size):
@@ -34,30 +42,6 @@ class Client:
             size = round(size / 1024 ** i, 2)
 
             return f"{size} {units[i]}"
-
-        def stalker(uuid: str, path: str):
-            if not os.path.exists("./stalker.json"):
-                stalker = {uuid: path}
-                with open("./stalker.json", "w", encoding="utf-8") as f:
-                    json.dump(stalker, f, indent=4, ensure_ascii=False)
-                return True
-            else:
-                with open("./stalker.json", "r", encoding="utf-8") as f:
-                    stalker = json.load(f)
-                try:
-                    if stalker[uuid] == path:
-                        return True
-                    else:
-                        old_path = stalker["uuid"]
-                        stalker[uuid] = path
-                        with open("./stalker.json", "w", encoding="utf-8") as f:
-                            json.dump(stalker, f, indent=4, ensure_ascii=False)
-                        return old_path
-                except:
-                    stalker[uuid] = path
-                    with open("./stalker.json", "w", encoding="utf-8") as f:
-                        json.dump(stalker, f, indent=4, ensure_ascii=False)
-                    return True
 
         if qsize := len(self.queue):
             files_num = 0
@@ -70,7 +54,7 @@ class Client:
             for i in range(qsize):
                 post = self.queue.popleft()
                 path = os.path.join(settings["directory"], f"{post['title']}[{post['name']}]")
-                if result := stalker(post["uuid"], os.path.basename(path)):
+                if result := self.stalker_check(post["uuid"], os.path.basename(path)):
                     if not os.path.exists(path):
                         os.makedirs(path, exist_ok=True)
                 else:
@@ -89,19 +73,31 @@ class Client:
                                 with open(file, "wb") as f:
                                     shutil.copyfileobj(response.raw, f)
                             Image.open(file)
+                            files_num = files_num + 1
+                            files_size = files_size + os.path.getsize(file)
+                            time.sleep(1)
+                            break
                         except (ProtocolError, UnidentifiedImageError, ChunkedEncodingError, ConnectionError):
                             time.sleep(10)
+                        except KeyboardInterrupt:
+                            print_("[*] Stopped.")
+                            input()
+                        except OSError as e:
+                            if str(e) == "[Errno 28] No space left on device":
+                                with open("./queue", "wb") as f:
+                                    pickle.dump(self.queue, f)
+                            else:
+                                print(type(e))
+                                print(str(e))
+                            os.remove(file)
+                            input()
+                            exit()
                         except Exception as e:
                             print(type(e))
                             print(str(e))
                             os.remove(file)
                             input()
                             exit()
-                        else:
-                            files_num = files_num + 1
-                            files_size = files_size + os.path.getsize(file)
-                            time.sleep(1)
-                            break
                     if "qbar" in locals():
                         qbar.update(1)
             if "qbar" in locals():
@@ -113,6 +109,22 @@ class Client:
             notification(f"Download finished.\n{info}")
         else:
             print_("[!] There is nothing in the queue.")
+
+    def stalker_check(self, uuid: str, path: str):
+        try:
+            if self.stalker[uuid] == path:
+                return True
+            else:
+                old_path = self.stalker[uuid]
+                self.stalker[uuid] = path
+                with open("./stalker.json", "w", encoding="utf-8") as f:
+                    json.dump(self.stalker, f, indent=4, ensure_ascii=False)
+                return old_path
+        except KeyError:
+            self.stalker[uuid] = path
+            with open("./stalker.json", "w", encoding="utf-8") as f:
+                json.dump(self.stalker, f, indent=4, ensure_ascii=False)
+            return True
 
     def parse(self, post: dict):
         # post["id_string"]
@@ -160,7 +172,7 @@ class Client:
             info = f"NAME: {name}\nTITLE: {title}\nPOSTS: {total_posts}\nURL: {blog_url}"
             print("")
             print(Colorate.Horizontal(Colors.blue_to_cyan,
-                Box.Lines(info), 1))
+                                      Box.Lines(info), 1))
             print("")
             notification(info)
         offset = 0
@@ -193,27 +205,30 @@ def input_(text: str):
     return Write.Input(Center.XCenter(text, spaces=40), Colors.blue_to_cyan,
                        interval=0, hide_cursor=True)
 
+
 def notification(message: str):
     def desktop(message: str):
         notice.notify(title="Notification", message=message, app_name="Tumbl-Ripper", app_icon="./icon.ico")
 
     def discord(message: str):
         if settings["notification"]["discord"]["webhookUrl"] != "":
-            if settings["notification"]["discord"]["mention"]["enable"] == True:
+            if settings["notification"]["discord"]["mention"]["enable"]:
                 if settings["notification"]["discord"]["mention"]["discordId"] != "":
                     message = f"<@{settings['notification']['discord']['mention']['discordId']}>\n{message}"
             DiscordWebhook(url=settings["notification"]["discord"]["webhookUrl"], content=message).execute()
 
-    if settings["notification"]["enable"] == True:
-        if settings["notification"]["desktop"]["enable"] == True:
+    if settings["notification"]["enable"]:
+        if settings["notification"]["desktop"]["enable"]:
             desktop(message)
-        if settings["notification"]["discord"]["enable"] == True:
+        if settings["notification"]["discord"]["enable"]:
             discord(message)
+
 
 def settings():
     with open("settings.toml", "rb") as f:
         settings = tomllib.load(f)
     return settings
+
 
 banner = """
 ┏┳┓     ┓ ┓  ┳┓•        
@@ -248,7 +263,7 @@ if __name__ == "__main__":
             else:
                 blog_name = m.group(1)
             with console.status("[bold green]Fetching data...") as status:
-                    client.user(blog_name)
+                client.user(blog_name)
             print_("[*] Fetch done.")
             client.download()
 
